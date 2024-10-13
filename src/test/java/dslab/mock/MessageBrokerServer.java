@@ -18,7 +18,6 @@ import java.util.Set;
  */
 public final class MessageBrokerServer extends Thread implements AutoCloseable {
 
-    @Getter
     private final TestOutputStream logs;
     private final boolean logClientConnected;
     private final Set<Socket> sockets = new HashSet<>();
@@ -63,7 +62,7 @@ public final class MessageBrokerServer extends Thread implements AutoCloseable {
              BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              BufferedWriter socketOut = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))
         ) {
-            socketOut.write("ok SQMP\n");
+            socketOut.write("ok SMQP\n");
             socketOut.flush();
 
             if (logClientConnected) {
@@ -120,5 +119,9 @@ public final class MessageBrokerServer extends Thread implements AutoCloseable {
                 // Ignored
             }
         }
+    }
+
+    public TestOutputStream getLogs() {
+        return logs;
     }
 }
