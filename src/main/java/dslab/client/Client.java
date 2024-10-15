@@ -2,28 +2,44 @@ package dslab.client;
 
 import dslab.ComponentFactory;
 import dslab.cli.ClientCLI;
+import dslab.config.Config;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 public class Client implements IClient {
+    private final String componentId;
+    private ClientCLI cli;
+    private final InputStream in;
+    private final OutputStream out;
 
     public Client(String componentId, InputStream in, OutputStream out) {
+        this.componentId = componentId;
+        this.in = in;
+        this.out = out;
     }
 
     @Override
     public void run() {
-        throw new RuntimeException("Not implemented yet.");
+        cli = new ClientCLI(this, new Config(componentId), in, out);
+        cli.run();
     }
 
     @Override
     public String getComponentId() {
-        return "";
+        return this.componentId;
     }
 
     @Override
     public void shutdown() {
-        throw new RuntimeException("Not implemented yet.");
+        try{
+            in.close();
+            out.close();
+        } catch (IOException e) {
+
+        }
+
     }
 
     /**

@@ -2,46 +2,157 @@ package dslab.connection;
 
 import dslab.connection.types.ExchangeType;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.nio.Buffer;
 import java.util.function.Consumer;
 
 public class Channel implements IChannel {
 
+    private String host;
+    private int port;
+    private Socket socket;
+    private BufferedReader in;
+    private PrintWriter out;
+    ExchangeType exchangeType;
+    String exchangeName;
+
     public Channel(String host, int port) {
+        this.host = host;
+        this.port = port;
     }
 
     @Override
-    public boolean connect() throws IOException {
-        return false;
+    public boolean connect() {
+        try {
+            socket = new Socket(host, port);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            out = new PrintWriter(socket.getOutputStream(), true);
+
+            String answer = in.readLine();
+            if (!answer.equals("ok SMQP")){
+                disconnect();
+                return false;
+            }
+            return true;
+        } catch (IOException e2) {
+            return false;
+        }
     }
+
 
     @Override
     public void disconnect() {
-        throw new RuntimeException("Not implemented yet.");
+        try{
+            out.println("exit");
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            //String answer = in.readLine();
+            /*
+            if (!answer.equals("ok bye")){
+                return;
+            }
+
+             */
+
+
+            //in.close();
+            //out.close();
+            socket.close();
+        } catch (IOException e) {
+
+        }
+
     }
 
     @Override
     public boolean exchangeDeclare(ExchangeType exchangeType, String exchangeName) {
-        return false;
+        this.exchangeType = exchangeType;
+        this.exchangeName = exchangeName;
+
+        out.println("exchange " + exchangeType.toString().toLowerCase() + " " + exchangeName);
+        try {
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String answer = in.readLine();
+            if (!answer.equals("ok")){
+                return false;
+            }
+        } catch (IOException e){
+            return false;
+        }
+
+        return true;
     }
 
     @Override
     public boolean queueBind(String queueName, String bindingKey) {
-        return false;
+        out.println("queue " + queueName);
+        try{
+            String answer = in.readLine();
+            if (!answer.equals("ok")){
+                return false;
+            }
+            out.println("bind " + bindingKey);
+            answer = in.readLine();
+            if (!answer.equals("ok")){
+                return false;
+            }
+        } catch (IOException e){
+            return false;
+        }
+
+        return true;
     }
 
     @Override
     public Thread subscribe(Consumer<String> callback) {
-        return null;
+        out.println("subscribe");
+
+        try{
+            String answer = in.readLine();
+            if (!answer.equals("ok")){
+                return null;
+            }
+        } catch (IOException e){
+            return null;
+        }
+
+        Subscription subscription = new Subscription(this, callback);
+        subscription.start();
+        return subscription;
     }
 
     @Override
     public String getFromSubscription() {
-        return "";
+        String msg = "";
+        try {
+            if (in.ready()) {
+                msg = in.readLine();
+            } else {
+                return null;
+            }
+        } catch (IOException e) {
+        }
+        return msg;
     }
 
     @Override
     public boolean publish(String routingKey, String message) {
-        return false;
+        out.println("publish " + routingKey + " " + message);
+
+        try {
+            String answer = in.readLine();
+            if (!answer.equals("ok")) {
+                return false;
+            }
+        } catch (IOException e) {
+            return false;
+        }
+
+        return true;
     }
 }
