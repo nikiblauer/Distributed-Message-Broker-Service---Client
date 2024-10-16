@@ -19,15 +19,12 @@ public class ClientCLI implements IClientCLI {
     private final IClient client;
     private final Config config;
     private final InputStream in;
-    private final OutputStream out;
     private final PrintStream printStream;
-    private Subscription subscription;
 
     public ClientCLI(IClient client, Config config, InputStream in, OutputStream out) {
         this.client = client;
         this.config = config;
         this.in = in;
-        this.out = out;
         this.printStream = new PrintStream(out);
     }
 
@@ -37,117 +34,140 @@ public class ClientCLI implements IClientCLI {
 
         while (true) {
             printPrompt();
-            if (scanner.hasNextLine()) {
-                String input = scanner.nextLine();
-                if(input.endsWith(" ")){
-                    printStream.println("error");
-                    continue;
-                }
 
-                String[] tokens = input.split(" ");
-                String command = tokens[0];
-                String[] args = Arrays.copyOfRange(tokens, 1, tokens.length);
+            if (!scanner.hasNextLine()) {
+                continue;
+            }
 
+            String input = scanner.nextLine();
+            if (input.isEmpty()) {
+                printError("Empty input");
+                continue;
+            }
 
-                if (command.equals("channel")) {
-                    if (args.length != 1){
-                        printStream.println("error: wrong number of arguments");
-                        continue;
-                    }
+            if (input.endsWith(" ")) {
+                printError("Input cannot end with a space");
+                continue;
+            }
 
-                    channel = createChannel(args[0]);
+            String[] tokens = input.split(" ");
+            String command = tokens[0];
+            String[] args = Arrays.copyOfRange(tokens, 1, tokens.length);
 
-                }
-                else if (command.equals("subscribe")) {
-                    if (channel == null){
-                        printStream.println("error: channel is null");
-                        continue;
-                    }
-                    if (args.length != 4){
-                        printStream.println("error: wrong number of arguments");
-                        continue;
-                    }
-
-                    String exchangeName = args[0];
-                    ExchangeType exchangeType;
-                    try {
-                        exchangeType = ExchangeType.valueOf(args[1].toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        printStream.println("error: wrong exchange type");
-                        continue;
-                    }
-                    String queueName = args[2];
-                    String bindingKey = args[3];
-
-                    channel.exchangeDeclare(exchangeType, exchangeName);
-                    channel.queueBind(queueName, bindingKey);
-
-                    // Subscribe and print messages received via callback
-                    subscription = (Subscription) channel.subscribe(msg -> printStream.println(msg));
-
-                    if (subscription == null){
-                        continue;
-                    }
-
-                    if (scanner.hasNext()){
-                        scanner.nextLine();
-                        subscription.interrupt();
-
-                    }
-                }
-                else if (command.equals("publish")) {
-                    if(channel == null){
-                        printStream.println("error: channel is null");
-                        printStream.flush();
-                        continue;
-                    }
-                    if (args.length != 4){
-                        printStream.println("error: wrong number of arguments");
-                        printStream.flush();
-
-                        continue;
-                    }
-                    String exchangeName = args[0];
-                    ExchangeType exchangeType = ExchangeType.DEFAULT;
-                    boolean changed = false;
-                    for (ExchangeType type : ExchangeType.values()){
-                        if (type.name().equalsIgnoreCase(args[1])){
-                            exchangeType = type;
-                            changed = true;
-                        }
-                    }
-                    if (!changed){
-                        printStream.println("error: wrong exchange type");
-                        continue;
-                    }
-
-                    String routingKey = args[2];
-                    String msg = args[3];
-                    channel.exchangeDeclare(exchangeType, exchangeName);
-                    channel.publish(routingKey, msg);
-                }
-                else if (command.equals("shutdown")) {
-                    if(args.length != 0){
-                        printStream.println("error: wrong number of arguments");
-                    }
-                    if (channel != null){
-                        channel.disconnect();
-                    }
-
-                    client.shutdown();
+            switch (command.toLowerCase()) {
+                case "channel":
+                    handleChannelCommand(args);
                     break;
-                }
-                else {
-                    printStream.println("error: Unknown command: " + command);
-                }
+                case "subscribe":
+                    handleSubscribeCommand(args, scanner);
+                    break;
+                case "publish":
+                    handlePublishCommand(args);
+                    break;
+                case "shutdown":
+                    handleShutdownCommand(args);
+                    return;
+                default:
+                    printError("Unknown command: " + command);
+                    break;
             }
         }
+    }
 
-        scanner.close();
-        printStream.close();
-        if(channel != null){
+    private void handleChannelCommand(String[] args) {
+        if (args.length != 1) {
+            printError("wrong number of arguments for channel");
+            return;
+        }
+        channel = createChannel(args[0]);
+    }
+
+    private void handleSubscribeCommand(String[] args, Scanner scanner) {
+        if (channel == null) {
+            printError("channel is null");
+            return;
+        }
+
+        if (args.length != 4) {
+            printError("wrong number of arguments for subscribe");
+            return;
+        }
+
+        String exchangeName = args[0];
+        ExchangeType exchangeType = parseExchangeType(args[1]);
+        if (exchangeType == null) {
+            printError("wrong exchange type");
+            return;
+        }
+
+        String queueName = args[2];
+        String bindingKey = args[3];
+
+        channel.exchangeDeclare(exchangeType, exchangeName);
+        channel.queueBind(queueName, bindingKey);
+
+        Subscription subscription = (Subscription) channel.subscribe(printStream::println);
+
+        if (subscription == null) {
+            return;
+        }
+
+        if (scanner.hasNext()) {
+            scanner.nextLine();
+            subscription.interrupt();
+        }
+    }
+
+    private void handlePublishCommand(String[] args) {
+        if (channel == null) {
+            printError("channel is null");
+            return;
+        }
+
+        if (args.length != 4) {
+            printError("wrong number of arguments for publish");
+            return;
+        }
+
+        String exchangeName = args[0];
+        ExchangeType exchangeType = parseExchangeType(args[1]);
+        if (exchangeType == null) {
+            printError("wrong exchange type");
+            return;
+        }
+
+        String routingKey = args[2];
+        String msg = args[3];
+
+        channel.exchangeDeclare(exchangeType, exchangeName);
+        channel.publish(routingKey, msg);
+    }
+
+    private void handleShutdownCommand(String[] args) {
+        if (args.length != 0) {
+            printError("wrong number of arguments for shutdown");
+            return;
+        }
+
+        if (channel != null) {
             channel.disconnect();
         }
+
+        client.shutdown();
+    }
+
+    private ExchangeType parseExchangeType(String typeStr) {
+        for (ExchangeType type : ExchangeType.values()) {
+            if (type.name().equalsIgnoreCase(typeStr)) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    private void printError(String errorMsg) {
+        printStream.println("error: " + errorMsg);
+        printStream.flush();
     }
 
     @Override

@@ -13,8 +13,8 @@ import java.util.function.Consumer;
 
 public class Channel implements IChannel {
 
-    private String host;
-    private int port;
+    private final String host;
+    private final int port;
     private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
@@ -35,7 +35,7 @@ public class Channel implements IChannel {
 
             String answer = in.readLine();
             if (!answer.equals("ok SMQP")){
-                disconnect();
+                closeSocket();
                 return false;
             }
             return true;
@@ -45,25 +45,32 @@ public class Channel implements IChannel {
     }
 
 
+    private void closeSocket() {
+        try{
+            if(socket != null){
+                socket.close();
+            }
+
+        } catch (IOException ignored){
+
+        }
+    }
+
     @Override
     public void disconnect() {
         try{
             out.println("exit");
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            //String answer = in.readLine();
-            /*
+            String answer = in.readLine();
+
             if (!answer.equals("ok bye")){
                 return;
             }
 
-             */
 
-
-            //in.close();
-            //out.close();
-            socket.close();
-        } catch (IOException e) {
+            closeSocket();
+        } catch (IOException ignored) {
 
         }
 
@@ -135,7 +142,7 @@ public class Channel implements IChannel {
             } else {
                 return null;
             }
-        } catch (IOException e) {
+        } catch (IOException ignored) {
         }
         return msg;
     }
@@ -146,7 +153,7 @@ public class Channel implements IChannel {
 
         try {
             String answer = in.readLine();
-            if (!answer.equals("ok")) {
+            if (answer == null || !answer.equals("ok")) {
                 return false;
             }
         } catch (IOException e) {
