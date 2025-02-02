@@ -1,0 +1,10 @@
+dslab/cli/ClientCLI.class
+dslab/connection/Channel.class
+dslab/cli/IClientCLI.class
+dslab/client/IClient.class
+dslab/connection/Subscription.class
+dslab/client/Client.class
+dslab/ComponentFactory.class
+dslab/config/Config.class
+dslab/connection/types/ExchangeType.class
+dslab/connection/IChannel.class

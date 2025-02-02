@@ -1,0 +1,11 @@
+dslab/grading/LocalGradingExtension.class
+dslab/util/streams/TestInputStream.class
+dslab/util/streams/TestOutputStream.class
+dslab/util/streams/NullOutputStream.class
+dslab/ClientCLITest.class
+dslab/mock/MessageBrokerServer.class
+dslab/util/RandomStringGenerator.class
+dslab/grading/TestMethodInfo.class
+dslab/ClientTest.class
+dslab/grading/GradingData.class
+dslab/annotations/GitHubClassroomGrading.class
